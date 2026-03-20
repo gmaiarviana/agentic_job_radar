@@ -63,7 +63,7 @@ Builder (script Python) -> scored/ -> output/index.html (revisao estatico)
 | Interface e plataforma de agente | OpenClaw + Lobster | OpenClaw: extensivel; Lobster: determinismo nativo |
 | Canal de interface | Telegram | API oficial do Telegram; reduz risco comparado a WhatsApp (Baileys) |
 | Orquestracao | Lobster (nao LangChain) | pipeline sequencial fixo; determinismo > dinamismo |
-| Isolamento de seguranca | usuario `sandbox` + Docker com volume restrito | evita acesso a credenciais pessoais |
+| Isolamento de seguranca | usuario `sandbox` (sem Docker) | evita acesso a credenciais pessoais |
 | Skills externas | nenhuma (ClawHub) | reduzir risco de submissions maliciosas |
 | Revisao | HTML estatico | sem servidor; simples e previsivel |
 | Dedup | `seen_jobs.json` | mesmo schema/lógica do `job_radar` |
@@ -79,10 +79,10 @@ guilh (admin)
   -> OpenClaw via Telegram
 
 sandbox (padrao)
-  -> Ollama instalado
-  -> OpenClaw instalado/rodando como servico
-  -> Docker com volume restrito a C:\SharedData\agentic_job_radar\
-  -> guilh acessa Ollama via HTTP em localhost (sem instancia propria)
+  -> Ollama instalado (OLLAMA_MODELS em `C:\SharedModels\`)
+  -> OpenClaw instalado e rodando como servico
+  -> scripts Python rodam diretamente no `sandbox`, lendo/gravando em `C:\SharedData\agentic_job_radar\`
+  -> guilh consome Ollama via HTTP em `localhost:11434` (sem instancia propria)
 
 C:\SharedModels\                          -> modelo (Qwen 2.5 7B) compartilhado
 C:\SharedData\agentic_job_radar\
@@ -97,12 +97,10 @@ C:\SharedData\agentic_job_radar\
 
 ## Seguranca (contrato do ambiente)
 
-- Docker Desktop roda como servico do sistema
-- volumes restritos apenas a `C:\SharedData\agentic_job_radar\`
+- Isolamento por usuario `sandbox` (sem containerização)
 - OpenClaw bind configurado para `127.0.0.1` (nao `0.0.0.0`)
 - nenhum usuario `sandbox` com credenciais pessoais do `guilh`
 - nenhuma skill de terceiros
-- GPU no container via NVIDIA Container Toolkit (WSL2, quando aplicavel)
 
 ## Portao go/no-go (Bloco 2)
 
@@ -127,14 +125,13 @@ Isso garante contratos claros entre agentes.
 ### Bloco 1 - Infraestrutura base
 1. Criar usuario `sandbox` no Windows
 2. Criar `C:\SharedModels\` e `C:\SharedData\agentic_job_radar\` com permissoes para `guilh` e `sandbox`
-3. Instalar Docker Desktop (usuario `guilh` admin); configurar NVIDIA Container Toolkit no WSL2
-4. Instalar Ollama no `sandbox`; apontar `OLLAMA_MODELS` para `C:\SharedModels\`; configurar bind em `127.0.0.1`
-5. Baixar Qwen 2.5 7B via Ollama no `sandbox` e validar execucao com GPU
-6. Instalar OpenClaw no `sandbox`; bind em `127.0.0.1`; montar apenas `C:\SharedData\agentic_job_radar\`
-7. Instalar Lobster no `sandbox`; validar integracao com OpenClaw
-8. Criar bot no Telegram (@BotFather); conectar ao OpenClaw; parear com conta do `guilh`
-9. Experimento simples: message via Telegram -> resposta local usando Qwen
-10. Validar que `guilh` consome Ollama via HTTP (localhost:11434)
+3. Instalar Ollama no `sandbox`; apontar `OLLAMA_MODELS` para `C:\SharedModels\`; configurar bind em `127.0.0.1`
+4. Baixar Qwen 2.5 7B via Ollama no `sandbox` e validar execucao com GPU
+5. Instalar OpenClaw no `sandbox`; bind em `127.0.0.1`; configurar para usar apenas `C:\SharedData\agentic_job_radar\` (sem container)
+6. Instalar Lobster no `sandbox`; validar integracao com OpenClaw
+7. Criar bot no Telegram (@BotFather); conectar ao OpenClaw; parear com conta do `guilh`
+8. Experimento simples: message via Telegram -> resposta local usando Qwen
+9. Validar que `guilh` consome Ollama via HTTP (localhost:11434)
 
 ### Bloco 2 - Primeiro agente (portao de qualidade)
 1. Skill de filtro de localizacao em Python; expor como step do Lobster
