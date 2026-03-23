@@ -1,6 +1,6 @@
 # agentic_job_radar
 
-Plano de Projeto (versao 2.3)
+Plano de Projeto (versao 2.4)
 
 Este repositorio e a base do `agentic_job_radar`, uma evolucao do `job_radar` com foco em:
 - pipeline local (custo zero de API)
@@ -54,21 +54,21 @@ Builder (script Python) -> scored/ -> output/index.html (revisao estatico)
 
 4. **Builder**
    - Gera `output/index.html` a partir de `scored/`
-   - Sem servidor: abre no browser do usuario `guilh`
+   - Sem servidor: o `guilh` abre o HTML via caminho WSL (`\\wsl$\Ubuntu\...\output\index.html`) para revisão estática; feedback ativo entra pelo Telegram
 
 ## Decisoes de arquitetura (principais)
 
 | Decisao | Escolha | Motivo |
 |---|---|---|
 | Runtime de modelo | Ollama | gratuito, suporte a GPU, compativel com OpenAI API |
-| Modelo inicial | Qwen 2.5 7B | bom suporte para PT e tool-use para 7B |
+| Modelo inicial | `qwen3:8b` | geração mais recente que o Qwen 2.5 7B; melhor raciocínio; cabe nos 8GB de VRAM |
 | Interface e plataforma de agente | OpenClaw + Lobster | OpenClaw: extensivel; Lobster: determinismo nativo |
 | Canal de interface | Telegram | API oficial do Telegram; reduz risco comparado a WhatsApp (Baileys) |
 | Orquestracao | Lobster (nao LangChain) | pipeline de vagas sequencial fixo; determinismo > dinamismo; Lobster permanece |
-| Isolamento de seguranca | Usuario `sandbox` | sem credenciais pessoais; sem acesso ao usuario `guilh`; Docker removido — o `sandbox` user já provê o isolamento necessario |
+| Isolamento de seguranca | `sandbox` (Ollama no Windows) + `openclaw` (OpenClaw/Lobster/workers no WSL2) | Ollama sem credenciais pessoais; agentes e dados do pipeline no Linux com `openclaw` separado do `gmrv`; Docker removido |
 | Containerização | Sem Docker | Docker foi avaliado e removido: é uma opção do OpenClaw, nao pre-requisito; `sandbox` user cumpre o papel de isolamento com menos friccao |
 | Skills externas | nenhuma (ClawHub) | reduzir risco de submissions maliciosas |
-| Revisao | HTML estatico | sem servidor; simples e previsivel |
+| Revisao | HTML estatico + Telegram | revisão por leitura do `output/index.html`; feedback ativo pelo Telegram (sem escrita direta do `guilh` nos artefatos do pipeline) |
 | Dedup | `seen_jobs.json` | mesmo schema/lógica do `job_radar` |
 | Bind address OpenClaw | `127.0.0.1` | nao expor na rede (0.0.0.0) |
 | Ordem do pipeline | filtro antes do enriquecedor | fetch HTTP é mais lento e fragil; rodar filtro basico primeiro elimina vagas invalidas sem custo de rede |
@@ -76,30 +76,37 @@ Builder (script Python) -> scored/ -> output/index.html (revisao estatico)
 | JS rendering | Playwright (backlog) | maioria das fontes atuais nao requer JS; avaliar impacto real antes de implementar |
 | Multi-agente de codigo (futuro, Bloco 4) | Deep Agents ou Symphony | mesmo problema (agente de codigo autonomo); Deep Agents CLI (LangChain) roda no terminal, interativo ou headless via pipe; Symphony no ecossistema OpenClaw — comparar na hora e escolher |
 
-## Estrutura de dados (Windows)
+## Estrutura de dados (WSL2 — filesystem Linux)
+
+Os dados do pipeline ficam no **filesystem Linux do WSL2** (Ubuntu), não em pasta Windows compartilhada — evita problemas de permissões do DrvFs e alinha com o isolamento do usuário `openclaw` (ver `SECURITY.md`).
+
+**Caminho no Ubuntu:** `/home/openclaw/agentic_job_radar/`
+
+**Acesso pelo `guilh` no Windows Explorer:** `\\wsl$\Ubuntu\home\openclaw\agentic_job_radar\` (leitura para revisão; HTML estático em `output\index.html`).
 
 ```
-guilh (admin)
-  -> consumo/revisao
-  -> leitura de C:\SharedData\agentic_job_radar\
-  -> OpenClaw via Telegram
+guilh (admin, Windows)
+  -> revisão: leitura via \\wsl$\Ubuntu\home\openclaw\agentic_job_radar\ (ex.: output\index.html)
+  -> feedback ativo para o agente: Telegram (OpenClaw) — não grava diretamente nos arquivos do pipeline
 
-sandbox (padrao)
-  -> Ollama instalado (OLLAMA_MODELS em `C:\SharedModels\`)
-  -> OpenClaw instalado e rodando como servico
-  -> scripts Python rodam diretamente no `sandbox`, lendo/gravando em `C:\SharedData\agentic_job_radar\`
-  -> guilh consome Ollama via HTTP em `localhost:11434` (sem instancia propria)
+sandbox (Windows)
+  -> Ollama instalado; modelos no diretório padrão (ex.: C:\Users\sandbox\.ollama\models\)
+  -> guilh consome Ollama via HTTP em localhost:11434 (sem instância própria)
 
-C:\SharedModels\                          -> modelo (Qwen 2.5 7B) compartilhado
-C:\SharedData\agentic_job_radar\
-  raw\                                    -> vagas brutas coletadas
-  filtered\                               -> apos filtro basico (titulo + localizacao)
-  enriched\                               -> vagas filtradas com HTML completo da pagina
-  scored\                                 -> apos scoring + analise
+openclaw (Linux no WSL2)
+  -> OpenClaw + Lobster + workers Python; leitura/gravação em /home/openclaw/agentic_job_radar/
+
+/home/openclaw/agentic_job_radar/
+  raw/                                    -> vagas brutas coletadas
+  filtered/                               -> apos filtro basico (titulo + localizacao)
+  enriched/                               -> vagas filtradas com HTML completo da pagina
+  scored/                                 -> apos scoring + analise
   seen_jobs.json                          -> dedup persistente (mesmo schema do `job_radar`)
-  logs\                                   -> raciocinio/explicacoes passo a passo por vaga
-  output\                                 -> HTML para revisao
+  logs/                                   -> raciocinio/explicacoes passo a passo por vaga
+  output/                                 -> HTML para revisao (index.html)
 ```
+
+**Nota:** `C:\SharedData\` e `C:\SharedModels\` foram abandonadas no plano atual.
 
 ## Schema de Dados (Bloco 0)
 
@@ -193,21 +200,21 @@ Se falhar: iterar no prompt/criterio antes de seguir para o Bloco 3.
 
 ## Proximos Passos
 
-### Bloco 0 — Definicao de schema e contrato de I/O
+### Bloco 0 — Definicao de schema e contrato de I/O *(concluido)*
 - Schema de cada diretorio definido (`raw/`, `filtered/`, `enriched/`, `scored/`)
 - Granularidade: um arquivo por vaga (`{id_hash}.json`)
 - Contrato de I/O JSON documentado
 - Ordem do pipeline ajustada: filtro antes do enriquecedor
 
-### Bloco 1 — Infraestrutura base
-1. Criar usuario `sandbox` no Windows
-2. Criar `C:\SharedModels\` e `C:\SharedData\agentic_job_radar\` com permissoes para `guilh` e `sandbox`
-3. Instalar Ollama no `sandbox`; apontar `OLLAMA_MODELS` para `C:\SharedModels\`; configurar bind em `127.0.0.1`
-4. Baixar Qwen 2.5 7B via Ollama no `sandbox`; validar que roda na GPU
-5. Instalar OpenClaw no usuario `sandbox`; configurar bind para `127.0.0.1`
-6. Instalar Lobster no `sandbox`; validar integracao com OpenClaw
-7. Criar bot no Telegram via @BotFather; conectar ao OpenClaw; parear com a conta do `guilh`
-8. Experimento simples: enviar mensagem via Telegram -> OpenClaw responde usando Qwen local
+### Bloco 1 — Infraestrutura base *(em andamento)*
+1. Usuario `sandbox` no Windows (Ollama)
+2. Dados do pipeline em `/home/openclaw/agentic_job_radar/` no WSL2 (filesystem Linux); `guilh` revisa via `\\wsl$\Ubuntu\home\openclaw\agentic_job_radar\`
+3. Ollama no `sandbox`; modelos no diretório padrão (`C:\Users\sandbox\.ollama\`); bind em `127.0.0.1`
+4. Modelo `qwen3:8b` via Ollama; validar execução na GPU
+5. OpenClaw + Lobster no WSL2 como usuario Linux `openclaw` (não `gmrv`); bind `127.0.0.1`
+6. WSL2: `umask=027` em `/etc/wsl.conf`; `networkingMode=mirrored` em `.wslconfig` (ver `INFRASTRUCTURE.md`, `SECURITY.md`)
+7. Bot Telegram via @BotFather; conectar ao OpenClaw; parear com a conta do `guilh`; feedback ativo pelo Telegram (sem escrita direta do `guilh` nos dados do pipeline)
+8. Experimento: Telegram → OpenClaw responde usando Ollama local (`qwen3:8b`)
 9. Validar que `guilh` consome Ollama via HTTP sem instancia propria
 
 ### Bloco 2 — Primeiro agente (portao de qualidade)
@@ -239,5 +246,5 @@ Se falhar: iterar no prompt/criterio antes de seguir para o Bloco 3.
 Migracao gradual — quando o novo pipeline produzir qualidade igual ou superior por pelo menos 2 semanas, o `job_radar` pode ser desativado.
 
 ---
-*Versao 2.3 — Mar 2026*
+*Versao 2.4 — Mar 2026*
 
