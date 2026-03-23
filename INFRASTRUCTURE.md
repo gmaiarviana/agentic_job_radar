@@ -106,18 +106,71 @@ options = "metadata,umask=027,fmask=137"
 
 ---
 
+## Node.js
+
+| Item | Valor |
+|---|---|
+| Instalado via | `nvm` (não via apt/sistema) — sem necessidade de `sudo` |
+| nvm path | `/home/openclaw/.nvm/` |
+| Para carregar em qualquer comando | `source ~/.nvm/nvm.sh` |
+| Motivo | `openclaw` fora do sudoers; `nvm` instala no home do usuário |
+| Node | `v22.22.1` |
+| npm | `10.9.4` |
+| Pacotes globais npm | ficam dentro do `nvm` (não usar `npm config set prefix` — conflita com `nvm`) |
+| Nota de debug | comandos `wsl -u openclaw` executados do PowerShell geram `chdir(/mnt/c/Windows/system32) failed 13` — é inofensivo (`fmask` bloqueia acesso do `openclaw` ao `system32`) |
+
+---
+
 ## OpenClaw
 
 | Item | Valor |
 |---|---|
 | Roda como | usuário Linux `openclaw` no WSL2 |
-| Instalação (planeada) | `npm install -g openclaw@latest && openclaw onboard --install-daemon` — requer Node **22.16+** ou **24** (recomendado); o *onboard* com `--install-daemon` instala o Gateway como serviço systemd no Linux |
+| Status | instalado e rodando (Mar 2026) |
+| Versão | `2026.3.22 (4dcc39c)` |
+| Instalado via | `npm install -g openclaw@latest` (nvm, sem `sudo`) |
+| Config | `/home/openclaw/.openclaw/openclaw.json` |
+| Config backup | `/home/openclaw/.openclaw/openclaw.json.bak` |
+| Workspace | `/home/openclaw/.openclaw/workspace/` |
+| Gateway service | `systemd user service` em `/home/openclaw/.config/systemd/user/openclaw-gateway.service` |
+| Lingering | habilitado (sobrevive a logout do `openclaw`) |
+| Runtime | Node (obrigatório para Telegram) |
+| Log file | `/tmp/openclaw/openclaw-2026-03-23.log` (padrão: `/tmp/openclaw/openclaw-{data}.log`) |
 | Bind address | `127.0.0.1` |
 | Porta Gateway | `18789` |
 | Dashboard | `http://127.0.0.1:18789` |
 | Modelo | Ollama → `qwen3:8b` via `http://127.0.0.1:11434` |
-| Skills externas | nenhuma (ClawHub desabilitado) |
-| Status | ainda não instalado (Mar 2026) |
+| Control UI | `assets` ausentes (cosmético — `pnpm ui:build` para gerar, não é necessário para o pipeline) |
+| Web search | `DuckDuckGo` selecionado no onboard, mas pede API key (inesperado — documentado como “key-free”). Web search irrelevante para o pipeline; resolver se necessário no futuro. |
+| Skills externas | nenhuma instalada (todas skipped no onboard) |
+| Hooks | nenhum habilitado |
+
+### Útil para debug (guilh -> openclaw via PowerShell)
+
+Comandos do guilh para o `openclaw` seguem o padrão:
+```powershell
+wsl -u openclaw -- bash -c "source ~/.nvm/nvm.sh && <comando>"
+```
+
+Ver logs do gateway:
+```powershell
+wsl -u openclaw -- bash -c "journalctl --user --no-pager -n 50 -u openclaw-gateway"
+```
+
+Status do serviço:
+```powershell
+wsl -u openclaw -- bash -c "systemctl --user status openclaw-gateway"
+```
+
+Reiniciar gateway:
+```powershell
+wsl -u openclaw -- bash -c "systemctl --user restart openclaw-gateway"
+```
+
+Ver config:
+```powershell
+wsl -u openclaw -- bash -c "source ~/.nvm/nvm.sh && openclaw config get gateway.auth.token"
+```
 
 ---
 
@@ -128,7 +181,7 @@ options = "metadata,umask=027,fmask=137"
 | Instalado via | incluído com OpenClaw (npm — não é instalação separada) |
 | Roda como | usuário Linux `openclaw` no WSL2 |
 | Workflows | `/home/openclaw/agentic_job_radar/` (filesystem Linux; não usar `C:\SharedData\`) |
-| Status | a instalar (depende da instalação do OpenClaw) |
+| Status | incluído com OpenClaw (instalado junto, Mar 2026) |
 
 ---
 
@@ -136,10 +189,14 @@ options = "metadata,umask=027,fmask=137"
 
 | Item | Valor |
 |---|---|
+| Status | criado e conectado (Mar 2026) |
+| Username | `@agentic_job_radar_bot` |
 | Criado via | @BotFather |
 | Conectado ao | OpenClaw (usuário `openclaw` no WSL2) |
-| Usuário autorizado | `guilh` (whitelist por user ID — a configurar no Bloco 4) |
-| Status | ainda não criado (Mar 2026) |
+| User ID autorizado (pairing) | `942075913 (guilh)` |
+| Pairing mode | padrão (primeiro usuário pareado) |
+| DM access policy | pairing (padrão) |
+| Token do bot | armazenado na config do OpenClaw (`openclaw.json`) |
 
 ---
 
@@ -149,6 +206,7 @@ options = "metadata,umask=027,fmask=137"
 |---|---|---|
 | `11434` | Ollama | `127.0.0.1` |
 | `18789` | OpenClaw Gateway | `127.0.0.1` |
+| `18791` | Browser control (OpenClaw) | `127.0.0.1` |
 
 ---
 
@@ -159,9 +217,9 @@ Não armazenar senhas aqui. Referência de onde cada credencial vive:
 | Credencial | Onde fica |
 |---|---|
 | Senha do usuário `sandbox` | Windows — definida pelo `guilh` |
-| Token do bot Telegram | OpenClaw config (a documentar após criação) |
+| Token do bot Telegram | OpenClaw config (`openclaw.json`) |
 | Token do OpenClaw Gateway | gerado no onboarding (a documentar após instalação) |
 
 ---
 
-*Última atualização: Mar 2026 — Bloco 1 em andamento (Ollama validado)*
+*Última atualização: Mar 2026 — Bloco 1 concluído*

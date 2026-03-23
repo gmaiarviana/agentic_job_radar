@@ -207,7 +207,7 @@ Se falhar: iterar no prompt/criterio antes de seguir para o Bloco 3.
 - Contrato de I/O JSON documentado
 - Ordem do pipeline ajustada: filtro antes do enriquecedor
 
-### Bloco 1 — Infraestrutura base *(em andamento)*
+### Bloco 1 — Infraestrutura base *(concluído)*
 1. ✅ Usuário `sandbox` criado no Windows
 2. ✅ WSL2 configurado (`umask=027`, `networkingMode=mirrored`)
 3. ✅ Usuário Linux `openclaw` criado no WSL2 (sem symlinks para credenciais do `guilh`)
@@ -215,9 +215,9 @@ Se falhar: iterar no prompt/criterio antes de seguir para o Bloco 3.
 5. ✅ Ollama instalado (sistema, PowerShell admin); modelo `qwen3:8b` instalado e validado (`GET /api/tags`)
 6. ✅ `C:\SharedData\` criada (abandonada no plano); `C:\SharedModels\` em uso pelo Ollama como model location atual
 7. ✅ Validar que `guilh` consome Ollama via HTTP sem instância própria
-- Instalar OpenClaw + Lobster no WSL2 como `openclaw`
-- Criar bot Telegram e conectar ao OpenClaw
-- Experimento: Telegram → OpenClaw responde usando `qwen3:8b`
+- ✅ Instalar OpenClaw + Lobster no WSL2 como `openclaw` (OpenClaw 2026.3.22 via nvm)
+- ✅ Criar bot Telegram e conectar ao OpenClaw (@agentic_job_radar_bot, pairing aprovado)
+- ✅ Experimento: Telegram → OpenClaw responde usando `qwen3:8b` (confirmado Mar 2026)
 
 ### Bloco 2 — Primeiro agente (portao de qualidade)
 *(Bloco 0 concluido)*
@@ -248,5 +248,5 @@ Se falhar: iterar no prompt/criterio antes de seguir para o Bloco 3.
 Migracao gradual — quando o novo pipeline produzir qualidade igual ou superior por pelo menos 2 semanas, o `job_radar` pode ser desativado.
 
 ---
-*Última atualização: Mar 2026 — Bloco 1 em andamento (Ollama validado)*
+*Última atualização: Mar 2026 — Bloco 1 concluído, Bloco 2 a iniciar*
 

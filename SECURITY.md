@@ -87,6 +87,21 @@ Verificação de isolamento do usuário `openclaw` realizada **antes** da instal
 - Pipeline inteiro com ownership `openclaw:openclaw`.
 
 ---
+## Pós-instalação OpenClaw (Mar 2026):
+
+Fatos confirmados:
+- OpenClaw 2026.3.22 instalado como openclaw via nvm (sem sudo, sem root)
+- Node.js v22.22.1 via nvm — binários dentro de `/home/openclaw/.nvm/` (não em paths de sistema)
+- Gateway rodando como systemd user service (PID do openclaw, lingering habilitado)
+- Nenhuma skill externa instalada (todas recusadas no onboard) — alinhado com decisão ClawHub
+- Nenhum hook habilitado
+- Gateway token gerado automaticamente, armazenado em `~/.openclaw/openclaw.json`
+- Bind confirmado: `127.0.0.1:18789` (gateway) e `127.0.0.1:18791` (browser control)
+- Telegram: `@agentic_job_radar_bot` conectado; pairing aprovado para user ID `942075913` (`guilh`)
+- DM access policy: pairing (apenas o primeiro usuário pareado interage) — funciona como whitelist durante desenvolvimento
+- Tools profile warning nos logs: allowlist contains unknown entries (`apply_patch`, `cron`, `image`, `image_generate`) — entries default que o runtime/modelo atual não suporta; inofensivo
+
+---
 
 ## Riscos conhecidos e aceitos
 
@@ -96,7 +111,9 @@ Verificação de isolamento do usuário `openclaw` realizada **antes** da instal
 | Bot Telegram sem whitelist | Apenas durante desenvolvimento; configurar no Bloco 4 | Aceito temporariamente |
 | Prompt injection via JDs de vagas | Sem skills externas; agente com escopo restrito ao pipeline | Mitigado parcialmente |
 | `gmrv` com acesso às credenciais e ao home do `guilh` | `gmrv` não é usado para o OpenClaw | Aceito |
+| `DuckDuckGo` web search configurado mas inoperante (pede API key) | `web search` irrelevante para o pipeline; resolver no Bloco 4 se necessário | Aceito |
+| Control UI sem assets (pnpm ui:build não executado) | Funcionalidade cosmética; gateway e Telegram funcionam sem UI | Aceito |
 
 ---
 
-*Última atualização: Mar 2026 — Bloco 1 em andamento (Ollama validado)*
+*Última atualização: Mar 2026 — Bloco 1 concluído*
