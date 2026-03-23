@@ -33,7 +33,9 @@ Atualizar sempre que houver mudança de infraestrutura.
 
 **Pastas Windows legadas:** `C:\SharedData\` e `C:\SharedModels\` foram criadas no início do Bloco 1 mas estão **abandonadas** no plano atual (não usar). Ainda existem no disco — o `guilh` pode apagá-las manualmente se quiser recuperar espaço.
 
-**Estado do diretório de trabalho:** `/home/openclaw/agentic_job_radar/` **ainda não foi criado** no Ubuntu; será criado como próximo passo do Bloco 1.
+**Estado do diretório de trabalho:** criado em 22/03/2026; acessível pelo `guilh` via `\\wsl$\Ubuntu\home\openclaw\agentic_job_radar\`.
+
+**Permissões (acesso pelo Explorer):** `/home/openclaw` e `/home/openclaw/agentic_job_radar` com modo `755` — necessário para o `guilh` enxergar o caminho via Windows Explorer.
 
 | Item | Valor |
 |---|---|

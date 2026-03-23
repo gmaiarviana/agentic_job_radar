@@ -207,15 +207,16 @@ Se falhar: iterar no prompt/criterio antes de seguir para o Bloco 3.
 - Ordem do pipeline ajustada: filtro antes do enriquecedor
 
 ### Bloco 1 — Infraestrutura base *(em andamento)*
-1. Usuario `sandbox` no Windows (Ollama)
-2. Dados do pipeline em `/home/openclaw/agentic_job_radar/` no WSL2 (filesystem Linux); `guilh` revisa via `\\wsl$\Ubuntu\home\openclaw\agentic_job_radar\`
-3. Ollama no `sandbox`; modelos no diretório padrão (`C:\Users\sandbox\.ollama\`); bind em `127.0.0.1`
-4. Modelo `qwen3:8b` via Ollama; validar execução na GPU
-5. OpenClaw + Lobster no WSL2 como usuario Linux `openclaw` (não `gmrv`); bind `127.0.0.1`
-6. WSL2: `umask=027` em `/etc/wsl.conf`; `networkingMode=mirrored` em `.wslconfig` (ver `INFRASTRUCTURE.md`, `SECURITY.md`)
-7. Bot Telegram via @BotFather; conectar ao OpenClaw; parear com a conta do `guilh`; feedback ativo pelo Telegram (sem escrita direta do `guilh` nos dados do pipeline)
-8. Experimento: Telegram → OpenClaw responde usando Ollama local (`qwen3:8b`)
-9. Validar que `guilh` consome Ollama via HTTP sem instancia propria
+1. ✅ Usuário `sandbox` criado no Windows
+2. ✅ WSL2 configurado (`umask=027`, `networkingMode=mirrored`)
+3. ✅ Usuário Linux `openclaw` criado no WSL2 (sem symlinks para credenciais do `guilh`)
+4. ✅ Estrutura `/home/openclaw/agentic_job_radar/` criada e acessível via `\\wsl$\Ubuntu\home\openclaw\agentic_job_radar\`
+5. ✅ Ollama instalado no `sandbox`; modelo `qwen3:8b` instalado e validado
+6. ✅ `C:\SharedData\` e `C:\SharedModels\` criadas mas abandonadas (podem ser deletadas)
+- Validar que `guilh` consome Ollama via HTTP sem instância própria
+- Instalar OpenClaw + Lobster no WSL2 como `openclaw`
+- Criar bot Telegram e conectar ao OpenClaw
+- Experimento: Telegram → OpenClaw responde usando `qwen3:8b`
 
 ### Bloco 2 — Primeiro agente (portao de qualidade)
 *(Bloco 0 concluido)*
