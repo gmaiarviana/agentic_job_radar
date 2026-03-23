@@ -19,9 +19,9 @@ O risco principal é o OpenClaw ser comprometido via **prompt injection** — in
 
 ---
 
-### WSL2: `umask=027` e isolamento do home do `guilh`
+### WSL2: DrvFs — `metadata`, `umask=027`, `fmask=137` e isolamento do home do `guilh`
 
-**Configuração:** `umask=027` em `/etc/wsl.conf` (efeito típico via opções de automount do DrvFs — ver `INFRASTRUCTURE.md`).
+**Configuração real:** em `/etc/wsl.conf`, automount do DrvFs com `options="metadata,umask=027,fmask=137"` (ver `INFRASTRUCTURE.md`). O `metadata` habilita suporte a permissões POSIX no mount do Windows. O `umask=027` restringe diretórios novos; o **`fmask=137`** aplica-se a arquivos no DrvFs de forma que o modo efetivo fique **640** (dono lê/escreve, grupo só lê, outros sem acesso) — mais restritivo do que só `umask=027` sozinho.
 
 **Efeito para o `openclaw`:** bloqueia acesso do usuário `openclaw` ao filesystem Windows sob `/mnt/c/Users/guilh/`, incluindo a chave SSH em `.ssh/id_ed25519` e demais arquivos do perfil do `guilh` montados com permissões restritivas.
 
@@ -38,7 +38,7 @@ O risco principal é o OpenClaw ser comprometido via **prompt injection** — in
 ```
 Além disso, o `gmrv` tem acesso amplo a `/mnt/c/Users/guilh/` via DrvFs.
 
-**Decisão:** OpenClaw roda exclusivamente como o usuário Linux `openclaw`, sem esses symlinks e com o reforço do `umask=027` sobre o acesso ao home do `guilh` em `/mnt/c/`.
+**Decisão:** OpenClaw roda exclusivamente como o usuário Linux `openclaw`, sem esses symlinks e com o reforço das opções de automount (`metadata`, `umask=027`, `fmask=137`) sobre o acesso ao home do `guilh` em `/mnt/c/`.
 
 **O `gmrv` não é removido** — é o usuário padrão do WSL2 e pode ser necessário para outras tarefas. Simplesmente não é usado para o OpenClaw.
 
@@ -72,11 +72,27 @@ O bot Telegram atualmente não tem whitelist — qualquer pessoa que encontre o 
 
 ---
 
+## Auditoria pré-instalação OpenClaw (Mar 2026)
+
+Verificação de isolamento do usuário `openclaw` realizada **antes** da instalação do OpenClaw. Resultados confirmados:
+
+- `openclaw` sem symlinks para credenciais (`.aws`, `.azure`, `.ssh` inexistentes no home).
+- Acesso ao home do `guilh` em `/mnt/c/Users/guilh/` bloqueado (Permission denied).
+- Acesso à chave SSH do `guilh` bloqueado (Permission denied).
+- `openclaw` fora do sudoers (sem escalonamento para root).
+- Nenhuma variável de ambiente com tokens, keys, secrets ou passwords.
+- Grupo `openclaw` contém apenas o próprio usuário (sem membros extra).
+- Ollama não responde no IP de rede (`192.168.15.29:11434` — timeout); apenas em `127.0.0.1`.
+- Crontab vazio; nenhum serviço systemd de usuário ativo.
+- Pipeline inteiro com ownership `openclaw:openclaw`.
+
+---
+
 ## Riscos conhecidos e aceitos
 
 | Risco | Mitigação | Status |
 |---|---|---|
-| `openclaw` com leitura possível em partes de `/mnt/c/` (DrvFs) | Sem symlinks para credenciais do `guilh`; `umask=027` bloqueia `/mnt/c/Users/guilh/` para o `openclaw`; sem ClawHub | Aceito com mitigação |
+| `openclaw` com leitura possível em partes de `/mnt/c/` (DrvFs) | Sem symlinks para credenciais do `guilh`; automount com `metadata`, `umask=027`, `fmask=137` bloqueia `/mnt/c/Users/guilh/` para o `openclaw`; sem ClawHub | Aceito com mitigação |
 | Bot Telegram sem whitelist | Apenas durante desenvolvimento; configurar no Bloco 4 | Aceito temporariamente |
 | Prompt injection via JDs de vagas | Sem skills externas; agente com escopo restrito ao pipeline | Mitigado parcialmente |
 | `gmrv` com acesso às credenciais e ao home do `guilh` | `gmrv` não é usado para o OpenClaw | Aceito |

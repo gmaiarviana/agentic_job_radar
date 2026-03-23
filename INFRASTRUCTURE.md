@@ -19,7 +19,7 @@ Atualizar sempre que houver mudança de infraestrutura.
 | Usuário | Propósito | Observações |
 |---|---|---|
 | `gmrv` | Usuário padrão existente | **NÃO usar para OpenClaw** — tem symlinks para credenciais do `guilh` (`.aws`, `.azure`) e acesso amplo ao home do `guilh` em `/mnt/c/Users/guilh/` |
-| `openclaw` | Roda o OpenClaw | Sem symlinks para credenciais; isolamento reforçado com `umask=027` (ver WSL2 abaixo) |
+| `openclaw` | Roda o OpenClaw | Sem symlinks para credenciais; isolamento reforçado com `options="metadata,umask=027,fmask=137"` no automount (ver WSL2 abaixo) |
 
 ### Symlinks perigosos no `gmrv` (não remover — só ignorar)
 ```
@@ -84,7 +84,7 @@ seen_jobs.json → dedup persistente
 | Versão | WSL2 |
 | Distro | Ubuntu 24.04.1 LTS |
 | Networking | `mirrored` (configurado em `%USERPROFILE%\.wslconfig`) |
-| `umask` | `027` em `/etc/wsl.conf` — grupos/outros sem leitura em arquivos novos do `guilh` no DrvFs; o usuário `openclaw` não acessa o home do `guilh` em `/mnt/c/Users/guilh/` (incl. `.ssh`) — ver `SECURITY.md` |
+| DrvFs (`[automount]` em `/etc/wsl.conf`) | `options="metadata,umask=027,fmask=137"` — `metadata` habilita permissões POSIX no mount do Windows; `fmask=137` resulta em modo **640** para arquivos no DrvFs (dono lê/escreve, grupo só lê, outros sem acesso); em conjunto com `umask=027`, o usuário `openclaw` não acessa o home do `guilh` em `/mnt/c/Users/guilh/` (incl. `.ssh`) — ver `SECURITY.md` |
 | Usuário padrão | `gmrv` (não usar para OpenClaw) |
 | Usuário OpenClaw | `openclaw` |
 
@@ -96,13 +96,13 @@ networkingMode=mirrored
 
 O mirrored networking garante que `127.0.0.1` dentro do WSL2 aponte para o mesmo `127.0.0.1` do Windows — necessário para o OpenClaw acessar o Ollama.
 
-### `/etc/wsl.conf` (dentro do Ubuntu — exemplo)
+### `/etc/wsl.conf` (dentro do Ubuntu — valor real do ambiente)
 ```ini
 [automount]
-options = "umask=027"
+options = "metadata,umask=027,fmask=137"
 ```
 
-Ajuste conforme a linha real do ambiente; o efeito desejado é `umask=027` aplicado ao mount do DrvFs.
+**Notas:** `metadata` permite que o WSL aplique semântica de permissões POSIX ao DrvFs. `fmask=137` faz com que arquivos montados fiquem em modo **640** (mais restritivo para “outros” do que só `umask=027` sem `fmask` explícito). O `umask=027` continua a atuar nos bits de diretórios e no conjunto das máscaras do automount.
 
 ---
 
