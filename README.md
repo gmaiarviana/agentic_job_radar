@@ -41,7 +41,7 @@ Builder (script Python) -> scored/ -> output/index.html (revisao estatico)
 
 1. **OpenClaw**
    - Interface e plataforma de agentes (Telegram -> usuario `guilh`)
-   - Suporte a expansao futura de pipelines multi-agente
+   - Suporte a expansao futura; multi-agente de codigo fica no Bloco 4 (Symphony vs Deep Agents — ver decisao abaixo)
 
 2. **Lobster**
    - Orquestrador deterministico do pipeline
@@ -64,7 +64,7 @@ Builder (script Python) -> scored/ -> output/index.html (revisao estatico)
 | Modelo inicial | Qwen 2.5 7B | bom suporte para PT e tool-use para 7B |
 | Interface e plataforma de agente | OpenClaw + Lobster | OpenClaw: extensivel; Lobster: determinismo nativo |
 | Canal de interface | Telegram | API oficial do Telegram; reduz risco comparado a WhatsApp (Baileys) |
-| Orquestracao | Lobster (nao LangChain) | pipeline sequencial fixo; determinismo > dinamismo |
+| Orquestracao | Lobster (nao LangChain) | pipeline de vagas sequencial fixo; determinismo > dinamismo; Lobster permanece |
 | Isolamento de seguranca | Usuario `sandbox` | sem credenciais pessoais; sem acesso ao usuario `guilh`; Docker removido — o `sandbox` user já provê o isolamento necessario |
 | Containerização | Sem Docker | Docker foi avaliado e removido: é uma opção do OpenClaw, nao pre-requisito; `sandbox` user cumpre o papel de isolamento com menos friccao |
 | Skills externas | nenhuma (ClawHub) | reduzir risco de submissions maliciosas |
@@ -74,7 +74,7 @@ Builder (script Python) -> scored/ -> output/index.html (revisao estatico)
 | Ordem do pipeline | filtro antes do enriquecedor | fetch HTTP é mais lento e fragil; rodar filtro basico primeiro elimina vagas invalidas sem custo de rede |
 | Granularidade dos arquivos | Um arquivo por vaga (`{id_hash}.json`) | retomada apos falha por vaga; debug direto; rastreamento do ciclo de vida de cada vaga entre diretórios |
 | JS rendering | Playwright (backlog) | maioria das fontes atuais nao requer JS; avaliar impacto real antes de implementar |
-| Expansao futura | Symphony | pipelines de codigo autônomas no ecossistema |
+| Multi-agente de codigo (futuro, Bloco 4) | Deep Agents ou Symphony | mesmo problema (agente de codigo autonomo); Deep Agents CLI (LangChain) roda no terminal, interativo ou headless via pipe; Symphony no ecossistema OpenClaw — comparar na hora e escolher |
 
 ## Estrutura de dados (Windows)
 
@@ -227,7 +227,7 @@ Se falhar: iterar no prompt/criterio antes de seguir para o Bloco 3.
 
 ### Bloco 4 — Expansao (backlog)
 - Autenticacao Telegram: whitelist por user ID no OpenClaw
-- Symphony para multi-agente de codigo autônomo
+- Multi-agente de codigo: avaliar **Symphony** (OpenClaw) vs **Deep Agents CLI** (LangChain) — ambos cobrem o caso; Deep Agents pode ser alternativa mais madura; escolher apos comparacao no Bloco 4
 - Playwright para sites com JS rendering (avaliar quantas fontes realmente precisam antes de implementar)
 - Validador de fontes (`source_candidates.yaml`)
 - Transparencia de raciocinio em tempo real
