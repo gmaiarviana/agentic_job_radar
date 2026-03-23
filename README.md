@@ -66,6 +66,7 @@ Builder (script Python) -> scored/ -> output/index.html (revisao estatico)
 | Canal de interface | Telegram | API oficial do Telegram; reduz risco comparado a WhatsApp (Baileys) |
 | Orquestracao | Lobster (nao LangChain) | pipeline de vagas sequencial fixo; determinismo > dinamismo; Lobster permanece |
 | Isolamento de seguranca | `sandbox` (Ollama no Windows) + `openclaw` (OpenClaw/Lobster/workers no WSL2) | Ollama sem credenciais pessoais; agentes e dados do pipeline no Linux com `openclaw` separado do `gmrv`; Docker removido |
+| Dados do pipeline | Filesystem Linux do WSL2 (`/home/openclaw/`) | DrvFs não suporta permissões granulares por usuário Linux; mover para Linux elimina dependência de `C:\SharedData\` e alinha com isolamento do `openclaw` |
 | Containerização | Sem Docker | Docker foi avaliado e removido: é uma opção do OpenClaw, nao pre-requisito; `sandbox` user cumpre o papel de isolamento com menos friccao |
 | Skills externas | nenhuma (ClawHub) | reduzir risco de submissions maliciosas |
 | Revisao | HTML estatico + Telegram | revisão por leitura do `output/index.html`; feedback ativo pelo Telegram (sem escrita direta do `guilh` nos artefatos do pipeline) |
@@ -90,7 +91,7 @@ guilh (admin, Windows)
   -> feedback ativo para o agente: Telegram (OpenClaw) — não grava diretamente nos arquivos do pipeline
 
 sandbox (Windows)
-  -> Ollama instalado; modelos no diretório padrão (ex.: C:\Users\sandbox\.ollama\models\)
+  -> Ollama (instalação de sistema; ver `INFRASTRUCTURE.md`); modelos: `C:\SharedModels` no ambiente atual
   -> guilh consome Ollama via HTTP em localhost:11434 (sem instância própria)
 
 openclaw (Linux no WSL2)
@@ -106,7 +107,7 @@ openclaw (Linux no WSL2)
   output/                                 -> HTML para revisao (index.html)
 ```
 
-**Nota:** `C:\SharedData\` e `C:\SharedModels\` foram abandonadas no plano atual.
+**Nota:** `C:\SharedData\` está abandonada no plano atual. `C:\SharedModels\` deixou de ser o caminho planejado para partilha com o WSL, mas neste ambiente o Ollama usa-a como *model location* (ver `INFRASTRUCTURE.md`).
 
 ## Schema de Dados (Bloco 0)
 
@@ -211,9 +212,9 @@ Se falhar: iterar no prompt/criterio antes de seguir para o Bloco 3.
 2. ✅ WSL2 configurado (`umask=027`, `networkingMode=mirrored`)
 3. ✅ Usuário Linux `openclaw` criado no WSL2 (sem symlinks para credenciais do `guilh`)
 4. ✅ Estrutura `/home/openclaw/agentic_job_radar/` criada e acessível via `\\wsl$\Ubuntu\home\openclaw\agentic_job_radar\`
-5. ✅ Ollama instalado no `sandbox`; modelo `qwen3:8b` instalado e validado
-6. ✅ `C:\SharedData\` e `C:\SharedModels\` criadas mas abandonadas (podem ser deletadas)
-- Validar que `guilh` consome Ollama via HTTP sem instância própria
+5. ✅ Ollama instalado (sistema, PowerShell admin); modelo `qwen3:8b` instalado e validado (`GET /api/tags`)
+6. ✅ `C:\SharedData\` criada (abandonada no plano); `C:\SharedModels\` em uso pelo Ollama como model location atual
+7. ✅ Validar que `guilh` consome Ollama via HTTP sem instância própria
 - Instalar OpenClaw + Lobster no WSL2 como `openclaw`
 - Criar bot Telegram e conectar ao OpenClaw
 - Experimento: Telegram → OpenClaw responde usando `qwen3:8b`
@@ -247,5 +248,5 @@ Se falhar: iterar no prompt/criterio antes de seguir para o Bloco 3.
 Migracao gradual — quando o novo pipeline produzir qualidade igual ou superior por pelo menos 2 semanas, o `job_radar` pode ser desativado.
 
 ---
-*Versao 2.4 — Mar 2026*
+*Última atualização: Mar 2026 — Bloco 1 em andamento (Ollama validado)*
 

@@ -31,7 +31,7 @@ Atualizar sempre que houver mudança de infraestrutura.
 
 ## Dados do pipeline (WSL2 — filesystem Linux)
 
-**Pastas Windows legadas:** `C:\SharedData\` e `C:\SharedModels\` foram criadas no início do Bloco 1 mas estão **abandonadas** no plano atual (não usar). Ainda existem no disco — o `guilh` pode apagá-las manualmente se quiser recuperar espaço.
+**Pastas Windows legadas:** `C:\SharedData\` foi criada no início do Bloco 1 e está **abandonada** no plano atual (não usar para o pipeline). `C:\SharedModels\` deixou de ser o caminho planejado para partilha com o WSL, mas o Ollama está a apontar para ela como *model location* atual — ver secção Ollama abaixo.
 
 **Estado do diretório de trabalho:** criado em 22/03/2026; acessível pelo `guilh` via `\\wsl$\Ubuntu\home\openclaw\agentic_job_radar\`.
 
@@ -61,16 +61,19 @@ seen_jobs.json → dedup persistente
 
 | Item | Valor |
 |---|---|
-| Instalado em | usuário Windows `sandbox` — raiz da instalação `C:\Users\sandbox\.ollama\` |
-| Model location | diretório padrão do Ollama: `C:\Users\sandbox\.ollama\models\` |
+| Instalado em | instalação de sistema via PowerShell admin (não por utilizador) |
+| Model location | `C:\SharedModels` (valor atual no ambiente; modelo `qwen3:8b` presente; Ollama apontado para este diretório) |
+| Tipo de processo | processo Windows (não serviço systemd nem serviço Windows dedicado documentado aqui) |
 | Bind address | `127.0.0.1` (não exposto na rede) |
 | Porta | `11434` |
-| Endpoint | `http://127.0.0.1:11434` |
+| Endpoint | `http://127.0.0.1:11434` (responde HTTP 200) |
 | Modelo | `qwen3:8b` |
-| Pull / cache | `qwen3:8b` instalado e validado |
+| Validação | `GET /api/tags` OK; `qwen3:8b` presente |
 | "Expose to network" | desligado |
 
-**Acesso pelo `guilh`:** via HTTP em `http://127.0.0.1:11434` — funciona graças ao mirrored networking do WSL2. Não requer instância própria do Ollama.
+**Acesso pelo `guilh`:** via HTTP em `http://127.0.0.1:11434` — sem instância própria do Ollama no perfil do `guilh`.
+
+**Acesso pelo WSL2 (`openclaw`):** `http://127.0.0.1:11434` com sucesso via *mirrored networking* — confirmado com `sudo -u openclaw curl` para o endpoint local.
 
 ---
 
@@ -108,12 +111,13 @@ Ajuste conforme a linha real do ambiente; o efeito desejado é `umask=027` aplic
 | Item | Valor |
 |---|---|
 | Roda como | usuário Linux `openclaw` no WSL2 |
+| Instalação (planeada) | `npm install -g openclaw@latest && openclaw onboard --install-daemon` — requer Node **22.16+** ou **24** (recomendado); o *onboard* com `--install-daemon` instala o Gateway como serviço systemd no Linux |
 | Bind address | `127.0.0.1` |
 | Porta Gateway | `18789` |
 | Dashboard | `http://127.0.0.1:18789` |
 | Modelo | Ollama → `qwen3:8b` via `http://127.0.0.1:11434` |
 | Skills externas | nenhuma (ClawHub desabilitado) |
-| Status | a instalar |
+| Status | ainda não instalado (Mar 2026) |
 
 ---
 
@@ -121,10 +125,10 @@ Ajuste conforme a linha real do ambiente; o efeito desejado é `umask=027` aplic
 
 | Item | Valor |
 |---|---|
-| Instalado via | npm (junto com OpenClaw) |
+| Instalado via | incluído com OpenClaw (npm — não é instalação separada) |
 | Roda como | usuário Linux `openclaw` no WSL2 |
 | Workflows | `/home/openclaw/agentic_job_radar/` (filesystem Linux; não usar `C:\SharedData\`) |
-| Status | a instalar |
+| Status | a instalar (depende da instalação do OpenClaw) |
 
 ---
 
@@ -135,7 +139,7 @@ Ajuste conforme a linha real do ambiente; o efeito desejado é `umask=027` aplic
 | Criado via | @BotFather |
 | Conectado ao | OpenClaw (usuário `openclaw` no WSL2) |
 | Usuário autorizado | `guilh` (whitelist por user ID — a configurar no Bloco 4) |
-| Status | a criar |
+| Status | ainda não criado (Mar 2026) |
 
 ---
 
@@ -160,4 +164,4 @@ Não armazenar senhas aqui. Referência de onde cada credencial vive:
 
 ---
 
-*Última atualização: Mar 2026 — Bloco 1 em andamento*
+*Última atualização: Mar 2026 — Bloco 1 em andamento (Ollama validado)*

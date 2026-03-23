@@ -83,4 +83,4 @@ O bot Telegram atualmente não tem whitelist — qualquer pessoa que encontre o 
 
 ---
 
-*Última atualização: Mar 2026 — Bloco 1 em andamento*
+*Última atualização: Mar 2026 — Bloco 1 em andamento (Ollama validado)*
