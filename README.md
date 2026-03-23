@@ -1,6 +1,6 @@
 # agentic_job_radar
 
-Plano de Projeto (versao 2.1)
+Plano de Projeto (versao 2.3)
 
 Este repositorio e a base do `agentic_job_radar`, uma evolucao do `job_radar` com foco em:
 - pipeline local (custo zero de API)
@@ -28,12 +28,14 @@ Objetivo: pipeline local com determinismo do orquestrador e execucao em workers 
 OpenClaw (interface: Telegram -> guilh)
   -> Lobster (orquestrador deterministico do pipeline)
      -> step 1: coletor      -> raw/
-     -> step 2: enriquecedor -> enriched/
-     -> step 3: filtro       -> filtered/
+     -> step 2: filtro       -> filtered/
+     -> step 3: enriquecedor -> enriched/
      -> step 4: scorer       -> scored/
 
 Builder (script Python) -> scored/ -> output/index.html (revisao estatico)
 ```
+
+**Nota:** o enriquecedor roda após o filtro básico — fetch HTTP só para vagas que sobreviveram à triagem de título e localização. Reduz carga e falhas em vagas que seriam eliminadas de qualquer jeito.
 
 ### Componentes
 
@@ -43,7 +45,7 @@ Builder (script Python) -> scored/ -> output/index.html (revisao estatico)
 
 2. **Lobster**
    - Orquestrador deterministico do pipeline
-   - YAML/flow fixo: `coletor -> enriquecedor -> filtro -> scorer -> builder`
+   - YAML/flow fixo: `coletor -> filtro -> enriquecedor -> scorer -> builder`
    - Passa JSON entre etapas; LLMs executam analise, Lobster controla o fluxo
 
 3. **Workers Python**
@@ -63,11 +65,15 @@ Builder (script Python) -> scored/ -> output/index.html (revisao estatico)
 | Interface e plataforma de agente | OpenClaw + Lobster | OpenClaw: extensivel; Lobster: determinismo nativo |
 | Canal de interface | Telegram | API oficial do Telegram; reduz risco comparado a WhatsApp (Baileys) |
 | Orquestracao | Lobster (nao LangChain) | pipeline sequencial fixo; determinismo > dinamismo |
-| Isolamento de seguranca | usuario `sandbox` (sem Docker) | evita acesso a credenciais pessoais |
+| Isolamento de seguranca | Usuario `sandbox` | sem credenciais pessoais; sem acesso ao usuario `guilh`; Docker removido — o `sandbox` user já provê o isolamento necessario |
+| Containerização | Sem Docker | Docker foi avaliado e removido: é uma opção do OpenClaw, nao pre-requisito; `sandbox` user cumpre o papel de isolamento com menos friccao |
 | Skills externas | nenhuma (ClawHub) | reduzir risco de submissions maliciosas |
 | Revisao | HTML estatico | sem servidor; simples e previsivel |
 | Dedup | `seen_jobs.json` | mesmo schema/lógica do `job_radar` |
 | Bind address OpenClaw | `127.0.0.1` | nao expor na rede (0.0.0.0) |
+| Ordem do pipeline | filtro antes do enriquecedor | fetch HTTP é mais lento e fragil; rodar filtro basico primeiro elimina vagas invalidas sem custo de rede |
+| Granularidade dos arquivos | Um arquivo por vaga (`{id_hash}.json`) | retomada apos falha por vaga; debug direto; rastreamento do ciclo de vida de cada vaga entre diretórios |
+| JS rendering | Playwright (backlog) | maioria das fontes atuais nao requer JS; avaliar impacto real antes de implementar |
 | Expansao futura | Symphony | pipelines de codigo autônomas no ecossistema |
 
 ## Estrutura de dados (Windows)
@@ -86,21 +92,95 @@ sandbox (padrao)
 
 C:\SharedModels\                          -> modelo (Qwen 2.5 7B) compartilhado
 C:\SharedData\agentic_job_radar\
-  raw\                                    -> vagas brutas
-  enriched\                               -> html completo da pagina + metadados adicionados
-  filtered\                               -> apos filtros (ex.: localizacao/titulo)
+  raw\                                    -> vagas brutas coletadas
+  filtered\                               -> apos filtro basico (titulo + localizacao)
+  enriched\                               -> vagas filtradas com HTML completo da pagina
   scored\                                 -> apos scoring + analise
-  seen_jobs.json                          -> deduplicacao persistente
+  seen_jobs.json                          -> dedup persistente (mesmo schema do `job_radar`)
   logs\                                   -> raciocinio/explicacoes passo a passo por vaga
   output\                                 -> HTML para revisao
 ```
 
-## Seguranca (contrato do ambiente)
+## Schema de Dados (Bloco 0)
 
-- Isolamento por usuario `sandbox` (sem containerização)
-- OpenClaw bind configurado para `127.0.0.1` (nao `0.0.0.0`)
-- nenhum usuario `sandbox` com credenciais pessoais do `guilh`
-- nenhuma skill de terceiros
+Cada arquivo segue o padrão `{id_hash}.json` — um arquivo por vaga, rastreavel entre diretorios pelo mesmo nome.
+
+### `raw/{id_hash}.json`
+Gravado pelo coletor. Campos obrigatorios:
+
+```json
+{
+  "id_hash": "string",
+  "source": "string",
+  "title": "string",
+  "company": "string",
+  "location": "string",
+  "salary": "string | null",
+  "url": "string",
+  "date": "string",
+  "collected_at": "string (ISO 8601)",
+  "jd_full": "string"
+}
+```
+
+`jd_full` vem da API/RSS da fonte — pode estar incompleto. O enriquecedor adiciona o conteudo real da pagina sem sobrescrever este campo.
+
+### `filtered/{id_hash}.json`
+Gravado pelo filtro. Herda todos os campos do `raw/` e adiciona:
+
+```json
+{
+  "filtered_at": "string (ISO 8601)",
+  "filter_reason": "string | null"
+}
+```
+
+Apenas vagas que passaram chegam aqui. `filter_reason` registra o motivo caso o filtro tenha tido duvida mas deixado passar (zona cinzenta).
+
+### `enriched/{id_hash}.json`
+Gravado pelo enriquecedor. Herda todos os campos do `filtered/` e adiciona:
+
+```json
+{
+  "jd_fetched": "string",
+  "fetch_status": "ok | failed",
+  "fetched_at": "string (ISO 8601)"
+}
+```
+
+`jd_full` original preservado para debug. `jd_fetched` contem o conteudo completo da pagina. O scorer usa `jd_fetched` se disponivel, senão cai para `jd_full`.
+
+### `scored/{id_hash}.json`
+Gravado pelo scorer. Herda todos os campos do `enriched/` e adiciona:
+
+```json
+{
+  "score": "int",
+  "score_ceiling": "int",
+  "ceiling_reason": "string",
+  "justification": "string",
+  "main_gap": "string",
+  "core_requirements": "array",
+  "seniority_comparison": "object",
+  "scored_at": "string (ISO 8601)"
+}
+```
+
+## Contrato de I/O dos Scripts Python (pre-requisito Lobster)
+
+Todo script worker deve respeitar o contrato do Lobster:
+- Aceita o path do arquivo de entrada como argumento (ou JSON no `stdin`)
+- Produz JSON no `stdout` com o resultado do step
+- Retorna exit code 0 em sucesso; non-zero em falha (interrompe o pipeline)
+- Grava o arquivo de saida em seu diretorio correspondente antes de responder no `stdout`
+
+## Seguranca
+
+- OpenClaw bind address configurado para `127.0.0.1` (nao `0.0.0.0`)
+- nenhuma credencial pessoal no usuario `sandbox`
+- nenhuma skill de terceiros — apenas skills proprias
+- GPU acessivel via Ollama no usuario `sandbox`
+- Autenticacao do bot Telegram: a definir (backlog — configurar whitelist por user ID antes de expor o bot)
 
 ## Portao go/no-go (Bloco 2)
 
@@ -111,51 +191,53 @@ Sobre uma amostra do mesmo dataset do `job_radar`:
 
 Se falhar: iterar no prompt/criterio antes de seguir para o Bloco 3.
 
-## Roadmap (visao v2.1)
+## Proximos Passos
 
-### Bloco 0 - Definicao de schema (antes do Bloco 2)
-Definir campos minimos de cada diretoria:
-- `raw/`      -> o que o coletor grava
-- `enriched/` -> o que o enriquecedor adiciona ao raw
-- `filtered/` -> o que sobra apos filtro de localizacao e titulo
-- `scored/`   -> o que o scorer grava
+### Bloco 0 — Definicao de schema e contrato de I/O
+- Schema de cada diretorio definido (`raw/`, `filtered/`, `enriched/`, `scored/`)
+- Granularidade: um arquivo por vaga (`{id_hash}.json`)
+- Contrato de I/O JSON documentado
+- Ordem do pipeline ajustada: filtro antes do enriquecedor
 
-Isso garante contratos claros entre agentes.
-
-### Bloco 1 - Infraestrutura base
+### Bloco 1 — Infraestrutura base
 1. Criar usuario `sandbox` no Windows
 2. Criar `C:\SharedModels\` e `C:\SharedData\agentic_job_radar\` com permissoes para `guilh` e `sandbox`
 3. Instalar Ollama no `sandbox`; apontar `OLLAMA_MODELS` para `C:\SharedModels\`; configurar bind em `127.0.0.1`
-4. Baixar Qwen 2.5 7B via Ollama no `sandbox` e validar execucao com GPU
-5. Instalar OpenClaw no `sandbox`; bind em `127.0.0.1`; configurar para usar apenas `C:\SharedData\agentic_job_radar\` (sem container)
+4. Baixar Qwen 2.5 7B via Ollama no `sandbox`; validar que roda na GPU
+5. Instalar OpenClaw no usuario `sandbox`; configurar bind para `127.0.0.1`
 6. Instalar Lobster no `sandbox`; validar integracao com OpenClaw
-7. Criar bot no Telegram (@BotFather); conectar ao OpenClaw; parear com conta do `guilh`
-8. Experimento simples: message via Telegram -> resposta local usando Qwen
-9. Validar que `guilh` consome Ollama via HTTP (localhost:11434)
+7. Criar bot no Telegram via @BotFather; conectar ao OpenClaw; parear com a conta do `guilh`
+8. Experimento simples: enviar mensagem via Telegram -> OpenClaw responde usando Qwen local
+9. Validar que `guilh` consome Ollama via HTTP sem instancia propria
 
-### Bloco 2 - Primeiro agente (portao de qualidade)
-1. Skill de filtro de localizacao em Python; expor como step do Lobster
-2. Rodar sobre amostra do `job_radar` (copiar manualmente para `enriched/` para teste)
-3. Comparar com `filter.py` atual e avaliar contra o portao
-4. Executar go/no-go; iterar antes de seguir se necessario
+### Bloco 2 — Primeiro agente (portao de qualidade)
+*(Bloco 0 concluido)*
+10. Construir `filtro.py`; respeitar contrato JSON de I/O; expor como step Lobster
+11. Rodar sobre amostra de vagas do `job_radar` (copiar manualmente para `raw/` para teste)
+12. Comparar resultado com `filter.py` atual — avaliar contra criterio do portao (julgamento do usuario)
+13. **Portao go/no-go:** se qualidade insatisfatoria, iterar no prompt antes de continuar
 
-### Bloco 3 - Pipeline completo (apos portao)
-1. Coletor (portar do `job_radar`)
-2. Enriquecedor (fetch completo da pagina da vaga)
-3. Scorer (requisitos -> senioridade -> dominio -> score)
-4. Builder (gerar `output/index.html` a partir de `scored/`)
-5. Workflow Lobster completo: coletor -> enriquecedor -> filtro -> scorer -> builder
-6. Validar end-to-end com 1 semana de dados reais
+### Bloco 3 — Pipeline completo (só apos portao)
+14. Construir `coletor.py` (portar coletores do `job_radar`)
+15. Construir `enriquecedor.py` (fetch HTTP da URL da vaga)
+16. Construir `scorer.py` (multi-step: requisitos -> senioridade -> dominio -> score)
+17. Construir Builder (gera `output/index.html` a partir de `scored/`)
+18. Montar workflow Lobster completo: coletor -> filtro -> enriquecedor -> scorer -> builder
+19. Validar pipeline end-to-end com 1 semana de dados reais
 
-### Bloco 4 - Expansao (backlog)
-- Symphony para multi-agente de codigo
-- Playwright para sites com JS rendering
+### Bloco 4 — Expansao (backlog)
+- Autenticacao Telegram: whitelist por user ID no OpenClaw
+- Symphony para multi-agente de codigo autônomo
+- Playwright para sites com JS rendering (avaliar quantas fontes realmente precisam antes de implementar)
 - Validador de fontes (`source_candidates.yaml`)
 - Transparencia de raciocinio em tempo real
 - Novos coletores
 
 ## Relacao com o `job_radar`
 
-O `job_radar` continua rodando via GitHub Actions enquanto `agentic_job_radar` nao for validado.
-Quando o novo pipeline produzir qualidade igual ou superior por 2 semanas, o `job_radar` pode ser desativado.
+`job_radar` continua rodando via GitHub Actions enquanto `agentic_job_radar` nao estiver validado.
+Migracao gradual — quando o novo pipeline produzir qualidade igual ou superior por pelo menos 2 semanas, o `job_radar` pode ser desativado.
+
+---
+*Versao 2.3 — Mar 2026*
 
